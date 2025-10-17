@@ -192,9 +192,31 @@
 
     if (videoId) {
       renderSingleVideo(videoId);
-    } else if (sessionStorage.getItem(STORAGE_KEY) === PASSWORD_HASH) {
-      loadPlaylist();
     } else {
+      initializeProtectedArea();
+    }
+
+    async function initializeProtectedArea() {
+      if (sessionStorage.getItem(STORAGE_KEY) === PASSWORD_HASH) {
+        loadPlaylist();
+        return;
+      }
+
+      try {
+        const response = await fetch("session.php", { credentials: "same-origin" });
+
+        if (response.ok) {
+          const payload = await response.json();
+          if (payload?.authorized) {
+            sessionStorage.setItem(STORAGE_KEY, PASSWORD_HASH);
+            loadPlaylist();
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("Erreur lors de la vérification de session", error);
+      }
+
       renderLogin();
     }
 
