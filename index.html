@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Espace Mémoire – Capsules vidéo</title>
+<style>
+  body{background:#0f0f10;color:#e0e0e0;font-family:Arial,sans-serif;text-align:center;padding:40px}
+  h1{color:#90caf9}
+  iframe{width:640px;height:360px;border:none;border-radius:10px}
+  .video-container{display:flex;flex-wrap:wrap;justify-content:center;gap:25px;margin-top:30px}
+  .video-card{background:#1c1c1e;padding:20px;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,.4);width:360px}
+  .qr canvas,.qr img{background:white;padding:10px;border-radius:10px}
+  button{margin-top:10px;padding:8px 16px;background:#2196f3;color:#fff;border:none;border-radius:6px;cursor:pointer}
+  a.retour{color:#90caf9;text-decoration:none;display:inline-block;margin-top:20px;font-size:18px}
+</style>
+</head>
+<body>
+<h1>Espace Mémoire – Capsules vidéo</h1>
+<div id="root"><p>Chargement…</p></div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script>
+const apiKey = "AIzaSyDop-z4X6tGbEhcxLBJns5vOUVY3-adAbI"; // ta clé API
+const playlistId = "PLO7U__0AocSdjdnPDiwBU5FXEADIl_Rtx";  // ta playlist
+const password = "DSM2025";
+const maxResults = 12;
+const root = document.getElementById("root");
+const params = new URLSearchParams(window.location.search);
+const id = params.get("id");
+
+// --- 1. Si un id est présent → vidéo seule ---
+if (id) {
+  root.innerHTML = `
+    <iframe src="https://www.youtube.com/embed/${id}?autoplay=1"
+      allow="autoplay; encrypted-media" allowfullscreen></iframe>
+    <br><a class="retour" href="index.html">← Retour à l’espace mémoire</a>
+  `;
+  console.log("Mode vidéo unique :", id);
+  return;
+}
+
+// --- 2. Sinon → protection par mot de passe ---
+root.innerHTML = `
+  <div>
+    <p>Veuillez entrer le mot de passe pour accéder à la collection complète :</p>
+    <input id="pwd" type="password" placeholder="Mot de passe">
+    <button id="go">Valider</button>
+    <p id="err" style="color:red"></p>
+  </div>
+`;
+document.getElementById("go").addEventListener("click", () => {
+  const val = document.getElementById("pwd").value.trim();
+  if (val === password) loadPlaylist();
+  else document.getElementById("err").textContent = "Mot de passe incorrect.";
+});
+
+// --- 3. Charger la playlist ---
+function loadPlaylist() {
+  console.log("Chargement de la playlist…");
+  fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=${maxResults}&playlistId=${playlistId}&key=${apiKey}`)
+    .then(r => {
+      if (!r.ok) throw new Error("Réponse HTTP " + r.status);
+      return r.json();
+    })
+    .then(d => {
+      console.log("Réponse API :", d);
+      if (!d.items) {
+        root.innerHTML = "<p>Aucune vidéo trouvée. Vérifie ta clé API ou ton ID de playlist.</p>";
+        return;
+      }
+      root.innerHTML = '<div class="video-container" id="videos"></div>';
+      const list = document.getElementById("videos");
+      d.items.forEach((it, i) => {
+        const vid = it.snippet?.resourceId?.videoId;
+        if (!vid) return;
+        const titre = it.snippet.title;
+        const local = `https://moumou88.click/?id=${vid}`;
+        const card = document.createElement("div");
+        card.className = "video-card";
+        card.innerHTML = `
+          <iframe src="https://www.youtube.com/embed/${vid}" allowfullscreen></iframe>
+          <h3>${titre}</h3>
+          <div class="qr" id="q${i}"></div>
+          <button>Télécharger le QR Code</button>
+        `;
+        list.appendChild(card);
+        const qDiv = document.getElementById("q"+i);
+        new QRCode(qDiv,{
+          text:local,
+          width:300,height:300,
+          colorDark:"#000",colorLight:"#fff",
+          correctLevel:QRCode.CorrectLevel.H
+        });
+        card.querySelector("button").addEventListener("click",()=>{
+          const img=qDiv.querySelector("img")||qDiv.querySelector("canvas");
+          const a=document.createElement("a");
+          a.href=img.src;a.download=`QR_${titre.replace(/[^a-z0-9]/gi,"_")}.png`;a.click();
+        });
+      });
+    })
+    .catch(e => {
+      console.error("Erreur API :", e);
+      root.innerHTML = `<p>Erreur de chargement des vidéos.<br>${e.message}</p>`;
+    });
+}
+</script>
+</body>
+</html>
