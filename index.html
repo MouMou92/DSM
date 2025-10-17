@@ -181,12 +181,9 @@
     </section>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" integrity="sha384-pizbtBmFPl4P6k6ldgmpPIk1DsHDWnSjS0N6YXNdUqMIgpFTjIY97oKKHgMHqV1Q" crossorigin="anonymous"></script>
+  <script src="assets/js/qrcode.js"></script>
   <script>
-    const API_KEY = "AIzaSyDop-z4X6tGbEhcxLBJns5vOUVY3-adAbI"; // TODO: restreindre ou proxy côté serveur
-    const PLAYLIST_ID = "PLO7U__0AocSdjdnPDiwBU5FXEADIl_Rtx";
     const PASSWORD_HASH = "aa01ad3c84d1519104cf71b88da94e7d9f13b74286150fd86152874ddd8460d1"; // SHA-256("DSM2025")
-    const MAX_RESULTS = 12;
     const STORAGE_KEY = "espace-memoire-auth";
 
     const root = document.getElementById("root");
@@ -224,7 +221,7 @@
       root.appendChild(wrapper);
     }
 
-    function renderLogin() {
+    function renderLogin(message = "") {
       root.innerHTML = `
         <p>Veuillez entrer le mot de passe pour accéder à la collection complète.</p>
         <form id="login-form">
@@ -237,6 +234,10 @@
       const form = document.getElementById("login-form");
       const field = document.getElementById("password");
       const error = document.getElementById("error");
+
+      if (message) {
+        error.textContent = message;
+      }
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -293,21 +294,21 @@
       `;
 
       document.getElementById("logout").addEventListener("click", () => {
-        sessionStorage.removeItem(STORAGE_KEY);
-        renderLogin();
+        logout();
       });
 
       try {
-        const url = new URL("https://www.googleapis.com/youtube/v3/playlistItems");
-        url.searchParams.set("part", "snippet");
-        url.searchParams.set("maxResults", MAX_RESULTS);
-        url.searchParams.set("playlistId", PLAYLIST_ID);
-        url.searchParams.set("key", API_KEY);
-        if (pageToken) {
-          url.searchParams.set("pageToken", pageToken);
+        const requestUrl = pageToken
+          ? `playlist.php?pageToken=${encodeURIComponent(pageToken)}`
+          : "playlist.php";
+
+        const response = await fetch(requestUrl, { credentials: "same-origin" });
+
+        if (response.status === 401 || response.status === 403) {
+          await logout("Session expirée. Veuillez vous reconnecter.");
+          return;
         }
 
-        const response = await fetch(url.toString());
         if (!response.ok) {
           throw new Error(`Réponse API ${response.status}`);
         }
@@ -323,8 +324,7 @@
           <p>Impossible de charger les vidéos pour le moment.</p>
         `;
         document.getElementById("logout").addEventListener("click", () => {
-          sessionStorage.removeItem(STORAGE_KEY);
-          renderLogin();
+          logout();
         });
       }
     }
@@ -341,8 +341,7 @@
 
       const logoutButton = wrapper.querySelector("#logout");
       logoutButton.addEventListener("click", () => {
-        sessionStorage.removeItem(STORAGE_KEY);
-        renderLogin();
+        logout();
       });
 
       if (!items.length) {
@@ -446,6 +445,22 @@
       }
 
       root.replaceChildren(wrapper);
+    }
+
+    async function logout(message = "") {
+      sessionStorage.removeItem(STORAGE_KEY);
+      try {
+        await fetch("logout.php", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Accept": "application/json",
+          },
+        });
+      } catch (error) {
+        console.error(error);
+      }
+      renderLogin(message);
     }
   </script>
 </body>
